@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import { MessageList } from "../components/messageList";
 import { MessageContainer } from "../components/messageContainer";
 
-const socket = io('http://localhost:3000');
+const socket = io('https://chat-vrjv.onrender.com/');
 const STORAGE_KEY = "chat-user-id";
 const USUARIOS = [
     { id: "jose", nombre: "Jose" },
