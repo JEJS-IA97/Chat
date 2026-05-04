@@ -6,14 +6,43 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+const app = express();
+app.use(cors());
+app.use(express.json());
+const server = http.createServer(app);
+
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
 const JWT_SECRET = process.env.JWT_SECRET || "mi_clave_secreta_super_segura";
+const MONGO_URI = "mongodb+srv://joseejimenez1411_db_user:ha4A9GE153AKQOCu@cluster0.hzcqvaf.mongodb.net/MiChatApp?retryWrites=true&w=majority&appName=Cluster0";
+
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('Conectado a MongoDB con exito'))
+    .catch(err => console.error('Error conectando a MongoDB:', err));
 
 const usuarioSchema = new mongoose.Schema({
     nombre: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true }
 });
+
 const Usuario = mongoose.model('Usuario', usuarioSchema);
+
+const mensajeSchema = new mongoose.Schema({
+    remitenteId: String,
+    remitenteNombre: String,
+    destinatarioId: String,
+    texto: String,
+    fecha: { type: Date, default: Date.now },
+    borradoPor: { type: [String], default: [] }
+});
+
+const Mensaje = mongoose.model('Mensaje', mensajeSchema);
 
 app.post('/api/auth/registro', async (req, res) => {
     try {
@@ -65,37 +94,6 @@ app.get('/api/usuarios', async (req, res) => {
     }
 });
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-const server = http.createServer(app);
-
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
-
-const usuariosConectados = new Map();
-
-const MONGO_URI = "mongodb+srv://joseejimenez1411_db_user:ha4A9GE153AKQOCu@cluster0.hzcqvaf.mongodb.net/MiChatApp?retryWrites=true&w=majority&appName=Cluster0";
-
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('Conectado a MongoDB con exito'))
-    .catch(err => console.error('Error conectando a MongoDB:', err));
-
-const mensajeSchema = new mongoose.Schema({
-    remitenteId: String,
-    remitenteNombre: String,
-    destinatarioId: String,
-    texto: String,
-    fecha: { type: Date, default: Date.now },
-    borradoPor: { type: [String], default: [] }
-});
-
-const Mensaje = mongoose.model('Mensaje', mensajeSchema);
-
 app.put('/api/mensajes/limpiar-local', async (req, res) => {
     const { usuarioId, contactoId } = req.body;
     try {
@@ -128,6 +126,8 @@ app.delete('/api/mensajes/borrar-definitivo', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+const usuariosConectados = new Map();
 
 const emitirUsuariosConectados = () => {
     io.emit('usuarios_conectados', Array.from(usuariosConectados.keys()));
@@ -198,16 +198,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', () => {
-        if (socket.data.userId) {
-            usuariosConectados.delete(socket.data.userId);
-            emitirUsuariosConectados();
-        }
-        console.log('Usuario desconectado');
-    });
-});
-
-socket.on('borrar_para_mi', async ({ usuarioId, contactoId }) => {
+    socket.on('borrar_para_mi', async ({ usuarioId, contactoId }) => {
         try {
             await Mensaje.updateMany(
                 {
@@ -245,6 +236,15 @@ socket.on('borrar_para_mi', async ({ usuarioId, contactoId }) => {
             console.error("Error borrando para todos:", error);
         }
     });
+
+    socket.on('disconnect', () => {
+        if (socket.data.userId) {
+            usuariosConectados.delete(socket.data.userId);
+            emitirUsuariosConectados();
+        }
+        console.log('Usuario desconectado');
+    });
+});
 
 const PUERTO = process.env.PORT || 3000;
 
