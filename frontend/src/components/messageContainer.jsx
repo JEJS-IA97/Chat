@@ -13,7 +13,9 @@ export const MessageContainer = ({
     onOpenSearch,
     onCloseSearch,
     searchTerm,
-    setSearchTerm
+    setSearchTerm,
+    onBorrarParaMi,
+    onBorrarParaTodos
 }) => {
     const chatEndRef = useRef(null);
 
@@ -22,11 +24,13 @@ export const MessageContainer = ({
     }, [mensajes]);
 
     return (
-        <section className="w-full h-full flex flex-col">
+        <section className="flex-1 h-full flex flex-col min-w-0 bg-white">
             <ContactProfile
                 contacto={contactoActivo}
-                onOpenSearch={onOpenSearch}
+                onOpenSearch={isSearchOpen ? onCloseSearch : onOpenSearch}
                 isOnline={contactoOnline}
+                onBorrarParaMi={onBorrarParaMi}
+                onBorrarParaTodos={onBorrarParaTodos}
             />
 
             {isSearchOpen && (
@@ -41,16 +45,16 @@ export const MessageContainer = ({
                         />
                         <button
                             type="button"
-                            onClick={onCloseSearch}
+                            onClick={() => setSearchTerm('')}
                             className="rounded-md bg-[#6daad7] px-3 py-1 text-[12px] font-semibold text-white cursor-pointer"
                         >
-                            Cerrar
+                            Limpiar
                         </button>
                     </div>
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-slate-50 border-b-2 border-[#d1dbe4]">
+            <div className="w-full max-w-full flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-4 border-b-2 border-[#d1dbe4]">
                 {mensajes?.map((msg, index) => (
                     <Message
                         key={index}
