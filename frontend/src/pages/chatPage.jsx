@@ -159,8 +159,10 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
                     onlineUsers={usuariosConectados}
                     getPreview={obtenerUltimoMensaje}
                     miUsuario={miUsuario}
-                    onChangeUser={onCerrarSesion}
+                    onCerrarSesion={onCerrarSesion}
                 />
+
+                {contactoActivo ? (
                 <MessageContainer
                     mensajes={mensajesFiltrados}
                     miUsuario={miUsuario}
@@ -175,6 +177,18 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
                     onBorrarParaMi={borrarParaMi}
                     onBorrarParaTodos={borrarParaTodos}
                 />
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center bg-white min-w-0">
+                        <div className="h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                            <span className="text-3xl text-slate-300">👥</span>
+                        </div>
+                        <p className="text-[18px] font-bold text-slate-700">Sin contactos disponibles</p>
+                        <p className="text-[14px] text-slate-500 mt-2 text-center px-4">
+                            Eres el único usuario registrado por ahora.<br/>
+                            Abre otra pestaña, registra otro usuario y vuelve aquí para empezar a chatear.
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );
