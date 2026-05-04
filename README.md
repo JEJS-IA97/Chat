@@ -35,17 +35,22 @@ Sigue estos pasos para correr el proyecto en tu máquina local:
 * Una cuenta en [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) o MongoDB instalado localmente.
 
 ### 1. Clonar el repositorio
-git clone [https://github.com/JEJS-IA97/Chat.git](https://github.com/JEJS-IA97/Chat.git)
-cd Chat
-
-### 2. Configurar el Backend
-cd backend
-npm install
-
-### 3. Abre una nueva terminal y navega a la carpeta del frontend
-cd frontend
-npm install
 
 ```bash
 git clone [https://github.com/JEJS-IA97/Chat.git](https://github.com/JEJS-IA97/Chat.git)
-cd Chat
+cd Chat bash
+```
+
+### 2. Configurar el Backend
+
+```bash
+cd backend
+npm install
+```
+
+### 3. Abre una nueva terminal y navega a la carpeta del frontend
+
+```bash
+cd frontend
+npm install
+```
