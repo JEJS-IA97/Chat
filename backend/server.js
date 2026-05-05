@@ -28,7 +28,8 @@ mongoose.connect(MONGO_URI)
 const usuarioSchema = new mongoose.Schema({
     nombre: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true }
+    password: { type: String, required: true },
+    contactos: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }] 
 });
 
 const Usuario = mongoose.model('Usuario', usuarioSchema);
@@ -85,10 +86,28 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-app.get('/api/usuarios', async (req, res) => {
+app.get('/api/usuarios/:id', async (req, res) => {
     try {
-        const usuarios = await Usuario.find({}, { password: 0 }); 
-        res.status(200).json(usuarios);
+        const usuario = await Usuario.findById(req.params.id).populate('contactos', 'nombre email _id');
+        if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+        
+        res.status(200).json(usuario.contactos);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/contactos/agregar', async (req, res) => {
+    const { miId, emailContacto } = req.body;
+    try {
+        const nuevoContacto = await Usuario.findOne({ email: emailContacto });
+        if (!nuevoContacto) return res.status(404).json({ error: "No existe un usuario registrado con ese correo." });
+        if (nuevoContacto._id.toString() === miId) return res.status(400).json({ error: "No puedes agregarte a ti mismo." });
+
+        await Usuario.findByIdAndUpdate(miId, { $addToSet: { contactos: nuevoContacto._id } });
+        await Usuario.findByIdAndUpdate(nuevoContacto._id, { $addToSet: { contactos: miId } });
+
+        res.status(200).json({ success: true, mensaje: "Contacto agregado correctamente" });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

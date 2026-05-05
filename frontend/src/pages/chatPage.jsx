@@ -27,6 +27,23 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
 
+    const [noLeidos, setNoLeidos] = useState({}); 
+    const chatActivoRef = useRef(contactoActivoId);
+    const [previews, setPreviews] = useState({});
+
+    useEffect(() => {
+        chatActivoRef.current = contactoActivoId;
+    }, [contactoActivoId]);
+
+    useEffect(() => {
+        const total = Object.values(noLeidos).reduce((suma, cantidad) => suma + cantidad, 0);
+        if (total > 0) {
+            document.title = `(${total}) Nuevo mensaje`;
+        } else {
+            document.title = "Mi Chat App";
+        }
+    }, [noLeidos]);
+
     useEffect(() => {
         if (!token) return;
 
@@ -38,10 +55,34 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
 
         newSocket.on('historial_mensajes', (historial) => {
             setMensajes(unirMensajes([], historial));
+
+            if (historial.length > 0) {
+                const ultimo = historial[historial.length - 1];
+                const contactId = ultimo.remitenteId === miUsuario.id ? ultimo.destinatarioId : ultimo.remitenteId;
+                const prefijo = ultimo.remitenteId === miUsuario.id ? "Tú" : ultimo.remitenteNombre;
+                
+                setPreviews(prev => ({ ...prev, [contactId]: `${prefijo}: ${ultimo.texto}` }));
+            }
         });
+
         newSocket.on('recibir_mensaje', (nuevo) => {
             setMensajes((prev) => unirMensajes(prev, [nuevo]));
+
+            const contactId = nuevo.remitenteId === miUsuario?.id ? nuevo.destinatarioId : nuevo.remitenteId;
+            const prefijo = nuevo.remitenteId === miUsuario?.id ? "Tú" : nuevo.remitenteNombre;
+            setPreviews(prev => ({ ...prev, [contactId]: `${prefijo}: ${nuevo.texto}` }));
+
+            if (nuevo.remitenteId !== miUsuario?.id && chatActivoRef.current !== nuevo.remitenteId) {
+                const audio = new Audio('/alerta.mp3');
+                audio.play().catch(err => console.log("El navegador bloqueó el autoplay", err));
+
+                setNoLeidos(prev => ({
+                    ...prev,
+                    [nuevo.remitenteId]: (prev[nuevo.remitenteId] || 0) + 1
+                }));
+            }
         });
+
         newSocket.on('usuarios_conectados', (usuarios) => setUsuariosConectados(usuarios));
 
         newSocket.on('chat_limpiado', ({ usuario1, usuario2 }) => {
@@ -55,21 +96,48 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
         return () => {
             newSocket.disconnect();
         };
-    }, [token]);
+    }, [token, miUsuario]);
 
-    useEffect(() => {
+useEffect(() => {
         if (miUsuario) {
-            fetch('https://chat-vrjv.onrender.com/api/usuarios')
+            fetch(`https://chat-vrjv.onrender.com/api/usuarios/${miUsuario.id}`)
                 .then(res => res.json())
                 .then(data => {
-                    const misContactos = data.filter(u => u._id !== miUsuario.id);
-                    setContactosDb(misContactos.map(c => ({ id: c._id, nombre: c.nombre })));
+                    // Como el backend ya filtró y nos manda solo el array de contactos, lo guardamos directo
+                    if (Array.isArray(data)) {
+                        setContactosDb(data.map(c => ({ id: c._id, nombre: c.nombre })));
+                    }
                 })
-                .catch(err => console.error("Error cargando usuarios:", err));
+                .catch(err => console.error("Error cargando contactos:", err));
         }
     }, [miUsuario]);
 
     const contactoActivo = contactosDb.find((contacto) => contacto.id === contactoActivoId) || contactosDb[0] || null;
+
+    const agregarContacto = async (email) => {
+        try {
+            const response = await fetch('https://chat-vrjv.onrender.com/api/contactos/agregar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ miId: miUsuario.id, emailContacto: email })
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Si funciona, recargamos la lista de contactos al instante
+                const resUsers = await fetch(`https://chat-vrjv.onrender.com/api/usuarios/${miUsuario.id}`);
+                const dataUsers = await resUsers.json();
+                if (Array.isArray(dataUsers)) {
+                    setContactosDb(dataUsers.map(c => ({ id: c._id, nombre: c.nombre })));
+                }
+            } else {
+                alert(data.error);
+            }
+        } catch (error) {
+            console.error("Fallo en la petición de agregar contacto:", error);
+            alert("Error de conexión al agregar contacto. Revisa la consola.");
+        }
+    };
 
     useEffect(() => {
         if (socketRef.current && miUsuario && contactoActivo) {
@@ -80,7 +148,7 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
             setSearchTerm("");
             setIsSearchOpen(false);
         }
-    }, [contactoActivoId, socketRef, miUsuario, contactoActivo]);
+    }, [contactoActivoId, miUsuario, contactoActivo]); 
 
     const enviarMensaje = (texto) => {
         if (!miUsuario || !contactoActivo || !socketRef.current) return;
@@ -128,12 +196,7 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
     };
 
     const obtenerUltimoMensaje = (contactId) => {
-        const mensajesDelContacto = mensajes.filter((msg) => {
-            const enviadoPorMi = msg.remitenteId === miUsuario?.id && msg.destinatarioId === contactId;
-            const recibidoDeContacto = msg.remitenteId === contactId && msg.destinatarioId === miUsuario?.id;
-            return enviadoPorMi || recibidoDeContacto;
-        });
-        return mensajesDelContacto.at(-1)?.texto || "Sin mensajes todavia";
+        return previews[contactId] || "Clic para ver mensajes";
     };
 
     const mensajesDelChatActivo = mensajes.filter((msg) => {
@@ -155,11 +218,18 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
                 <MessageList
                     contacts={contactosDb}
                     contactoActivo={contactoActivo}
-                    onSelectContact={(contacto) => setContactoActivoId(contacto.id)}
+                    onSelectContact={(contacto) => {
+                        setContactoActivoId(contacto.id);
+                        setSearchTerm("");
+                        setIsSearchOpen(false);
+                        setNoLeidos(prev => ({ ...prev, [contacto.id]: 0 }));
+                    }}
                     onlineUsers={usuariosConectados}
                     getPreview={obtenerUltimoMensaje}
                     miUsuario={miUsuario}
                     onCerrarSesion={onCerrarSesion}
+                    noLeidos={noLeidos}
+                    onAgregarContacto={agregarContacto}
                 />
 
                 {contactoActivo ? (
