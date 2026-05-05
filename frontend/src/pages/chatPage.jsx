@@ -98,12 +98,11 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
         };
     }, [token, miUsuario]);
 
-useEffect(() => {
+    useEffect(() => {
         if (miUsuario) {
             fetch(`https://chat-vrjv.onrender.com/api/usuarios/${miUsuario.id}`)
                 .then(res => res.json())
                 .then(data => {
-                    // Como el backend ya filtró y nos manda solo el array de contactos, lo guardamos directo
                     if (Array.isArray(data)) {
                         setContactosDb(data.map(c => ({ id: c._id, nombre: c.nombre })));
                     }
@@ -124,7 +123,6 @@ useEffect(() => {
             const data = await response.json();
             
             if (response.ok) {
-                // Si funciona, recargamos la lista de contactos al instante
                 const resUsers = await fetch(`https://chat-vrjv.onrender.com/api/usuarios/${miUsuario.id}`);
                 const dataUsers = await resUsers.json();
                 if (Array.isArray(dataUsers)) {
