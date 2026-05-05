@@ -18,7 +18,7 @@ return(
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Type a message..." 
-            className="text-[#6daad7] text-[14px] font-bold pl-4 focus:outline-none h-[40px] w-full bg-[#c7e3f9] rounded-lg"
+            className="text-[#6daad7] text-[14px] font-bold pl-4 pr-4 focus:outline-none h-[40px] w-full bg-[#c7e3f9] rounded-lg"
             />
             <button 
             type="submit"

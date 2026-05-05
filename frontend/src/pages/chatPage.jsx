@@ -31,18 +31,30 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
     const chatActivoRef = useRef(contactoActivoId);
     const [previews, setPreviews] = useState({});
 
+    const [solicitudesDb, setSolicitudesDb] = useState([]); 
+    const [quienEscribe, setQuienEscribe] = useState(null);
+
     useEffect(() => {
         chatActivoRef.current = contactoActivoId;
     }, [contactoActivoId]);
 
     useEffect(() => {
         const total = Object.values(noLeidos).reduce((suma, cantidad) => suma + cantidad, 0);
-        if (total > 0) {
-            document.title = `(${total}) Nuevo mensaje`;
-        } else {
-            document.title = "Mi Chat App";
-        }
+        document.title = total > 0 ? `(${total}) Nuevo mensaje` : "Mi Chat App";
     }, [noLeidos]);
+
+    const cargarDatosUsuario = () => {
+        if (!miUsuario) return;
+        fetch(`https://chat-vrjv.onrender.com/api/usuarios/${miUsuario.id}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.contactos) setContactosDb(data.contactos.map(c => ({ id: c._id, nombre: c.nombre })));
+                if (data.solicitudes) setSolicitudesDb(data.solicitudes.map(s => ({ id: s._id, nombre: s.nombre })));
+            })
+            .catch(err => console.error("Error cargando contactos:", err));
+    };
+
+    useEffect(() => { cargarDatosUsuario(); }, [miUsuario]);
 
     useEffect(() => {
         if (!token) return;
@@ -60,8 +72,8 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
                 const ultimo = historial[historial.length - 1];
                 const contactId = ultimo.remitenteId === miUsuario.id ? ultimo.destinatarioId : ultimo.remitenteId;
                 const prefijo = ultimo.remitenteId === miUsuario.id ? "Tú" : ultimo.remitenteNombre;
-                
-                setPreviews(prev => ({ ...prev, [contactId]: `${prefijo}: ${ultimo.texto}` }));
+
+                setPreviews(prev => ({ ...prev, [contactId]: { texto: `${prefijo}: ${ultimo.texto}`, fecha: new Date(ultimo.fecha).getTime() } }));
             }
         });
 
@@ -70,7 +82,8 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
 
             const contactId = nuevo.remitenteId === miUsuario?.id ? nuevo.destinatarioId : nuevo.remitenteId;
             const prefijo = nuevo.remitenteId === miUsuario?.id ? "Tú" : nuevo.remitenteNombre;
-            setPreviews(prev => ({ ...prev, [contactId]: `${prefijo}: ${nuevo.texto}` }));
+
+            setPreviews(prev => ({ ...prev, [contactId]: { texto: `${prefijo}: ${nuevo.texto}`, fecha: Date.now() } }));
 
             if (nuevo.remitenteId !== miUsuario?.id && chatActivoRef.current !== nuevo.remitenteId) {
                 const audio = new Audio('/alerta.mp3');
@@ -83,8 +96,10 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
             }
         });
 
-        newSocket.on('usuarios_conectados', (usuarios) => setUsuariosConectados(usuarios));
+        newSocket.on('escribiendo', (id) => setQuienEscribe(id));
+        newSocket.on('dejo_de_escribir', (id) => setQuienEscribe(prev => prev === id ? null : prev));
 
+        newSocket.on('usuarios_conectados', (usuarios) => setUsuariosConectados(usuarios));
         newSocket.on('chat_limpiado', ({ usuario1, usuario2 }) => {
             setMensajes(prev => prev.filter(msg => {
                 const esEsteChat = (msg.remitenteId === usuario1 && msg.destinatarioId === usuario2) ||
@@ -93,108 +108,87 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
             }));
         });
 
-        return () => {
-            newSocket.disconnect();
-        };
+        return () => { newSocket.disconnect(); };
     }, [token, miUsuario]);
 
-    useEffect(() => {
-        if (miUsuario) {
-            fetch(`https://chat-vrjv.onrender.com/api/usuarios/${miUsuario.id}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) {
-                        setContactosDb(data.map(c => ({ id: c._id, nombre: c.nombre })));
-                    }
-                })
-                .catch(err => console.error("Error cargando contactos:", err));
-        }
-    }, [miUsuario]);
+    const contactosOrdenados = [...contactosDb].sort((a, b) => {
+        const fechaA = previews[a.id]?.fecha || 0;
+        const fechaB = previews[b.id]?.fecha || 0;
+        return fechaB - fechaA; 
+    });
 
-    const contactoActivo = contactosDb.find((contacto) => contacto.id === contactoActivoId) || contactosDb[0] || null;
-
-    const agregarContacto = async (email) => {
-        try {
-            const response = await fetch('https://chat-vrjv.onrender.com/api/contactos/agregar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ miId: miUsuario.id, emailContacto: email })
-            });
-            const data = await response.json();
-            
-            if (response.ok) {
-                const resUsers = await fetch(`https://chat-vrjv.onrender.com/api/usuarios/${miUsuario.id}`);
-                const dataUsers = await resUsers.json();
-                if (Array.isArray(dataUsers)) {
-                    setContactosDb(dataUsers.map(c => ({ id: c._id, nombre: c.nombre })));
-                }
-            } else {
-                alert(data.error);
-            }
-        } catch (error) {
-            console.error("Fallo en la petición de agregar contacto:", error);
-            alert("Error de conexión al agregar contacto. Revisa la consola.");
-        }
-    };
+    const contactoActivo = contactosDb.find((contacto) => contacto.id === contactoActivoId) || null;
 
     useEffect(() => {
         if (socketRef.current && miUsuario && contactoActivo) {
-            socketRef.current.emit('solicitar_historial', { 
-                usuarioId: miUsuario.id, 
-                contactoId: contactoActivo.id 
-            });
+            socketRef.current.emit('solicitar_historial', { usuarioId: miUsuario.id, contactoId: contactoActivo.id });
             setSearchTerm("");
             setIsSearchOpen(false);
         }
     }, [contactoActivoId, miUsuario, contactoActivo]); 
 
+    // --- NUEVAS FUNCIONES ---
+    const emitirEscribir = (escribiendo) => {
+        if (!socketRef.current || !contactoActivoId) return;
+        socketRef.current.emit(escribiendo ? 'escribiendo' : 'dejo_de_escribir', { de: miUsuario.id, para: contactoActivoId });
+    };
+
+    const agregarContacto = async (email) => {
+        try {
+            // Cambiado a /solicitar
+            const response = await fetch('https://chat-vrjv.onrender.com/api/contactos/solicitar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ miId: miUsuario.id, emailContacto: email })
+            });
+            const data = await response.json();
+            alert(data.mensaje || data.error);
+        } catch (error) {
+            console.error("Fallo:", error);
+            alert("Error de conexión al solicitar contacto.");
+        }
+    };
+
+    const aceptarSolicitud = async (solicitanteId) => {
+        try {
+            const res = await fetch('https://chat-vrjv.onrender.com/api/contactos/aceptar', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ miId: miUsuario.id, solicitanteId })
+            });
+            if (res.ok) cargarDatosUsuario();
+        } catch (error) { console.error("Error al aceptar:", error); }
+    };
+
     const enviarMensaje = (texto) => {
         if (!miUsuario || !contactoActivo || !socketRef.current) return;
-
         const nuevoMensaje = {
-            remitenteId: miUsuario.id,
-            remitenteNombre: miUsuario.nombre,
-            destinatarioId: contactoActivo.id,
-            texto
+            remitenteId: miUsuario.id, remitenteNombre: miUsuario.nombre, destinatarioId: contactoActivo.id, texto
         };
-
         socketRef.current.emit("enviar_mensaje", nuevoMensaje);
     };
 
-    const borrarParaMi = () => {
+    const borrarParaMi = () => { /* tu código intacto */
         if (!miUsuario || !contactoActivo || !socketRef.current) return;
-        
-        socketRef.current.emit('borrar_para_mi', {
-            usuarioId: miUsuario.id,
-            contactoId: contactoActivo.id
-        });
-
+        socketRef.current.emit('borrar_para_mi', { usuarioId: miUsuario.id, contactoId: contactoActivo.id });
         setMensajes(prev => prev.filter(msg => {
-            const esEsteChat = (msg.remitenteId === miUsuario.id && msg.destinatarioId === contactoActivo.id) ||
-                                (msg.remitenteId === contactoActivo.id && msg.destinatarioId === miUsuario.id);
+            const esEsteChat = (msg.remitenteId === miUsuario.id && msg.destinatarioId === contactoActivo.id) || (msg.remitenteId === contactoActivo.id && msg.destinatarioId === miUsuario.id);
             return !esEsteChat; 
         }));
     };
 
-    const borrarParaTodos = () => {
+    const borrarParaTodos = () => { /* tu código intacto */
         if (!miUsuario || !contactoActivo || !socketRef.current) return;
-        
         if (window.confirm("¿Seguro que deseas eliminar todos los mensajes para ambos? Esta acción no se puede deshacer.")) {
-            socketRef.current.emit('borrar_para_todos', {
-                usuarioId: miUsuario.id,
-                contactoId: contactoActivo.id
-            });
-            
+            socketRef.current.emit('borrar_para_todos', { usuarioId: miUsuario.id, contactoId: contactoActivo.id });
             setMensajes(prev => prev.filter(msg => {
-                const esEsteChat = (msg.remitenteId === miUsuario.id && msg.destinatarioId === contactoActivo.id) ||
-                                    (msg.remitenteId === contactoActivo.id && msg.destinatarioId === miUsuario.id);
+                const esEsteChat = (msg.remitenteId === miUsuario.id && msg.destinatarioId === contactoActivo.id) || (msg.remitenteId === contactoActivo.id && msg.destinatarioId === miUsuario.id);
                 return !esEsteChat;
             }));
         }
     };
 
     const obtenerUltimoMensaje = (contactId) => {
-        return previews[contactId] || "Clic para ver mensajes";
+        return previews[contactId]?.texto || "Clic para ver mensajes";
     };
 
     const mensajesDelChatActivo = mensajes.filter((msg) => {
@@ -214,7 +208,8 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
         <div className="min-h-screen w-full flex items-center justify-center px-[30px] bg-slate-50">
             <div className="h-[600px] w-full max-w-[1200px] flex border-2 border-[#d1dbe4] rounded-lg overflow-hidden bg-white shadow-sm">
                 <MessageList
-                    contacts={contactosDb}
+                    contacts={contactosOrdenados}
+                    solicitudes={solicitudesDb}
                     contactoActivo={contactoActivo}
                     onSelectContact={(contacto) => {
                         setContactoActivoId(contacto.id);
@@ -228,6 +223,7 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
                     onCerrarSesion={onCerrarSesion}
                     noLeidos={noLeidos}
                     onAgregarContacto={agregarContacto}
+                    onAceptarSolicitud={aceptarSolicitud}
                 />
 
                 {contactoActivo ? (
@@ -244,6 +240,8 @@ export const ChatPage = ({ token, miUsuario, onCerrarSesion }) => {
                     setSearchTerm={setSearchTerm}
                     onBorrarParaMi={borrarParaMi}
                     onBorrarParaTodos={borrarParaTodos}
+                    isTyping={quienEscribe === contactoActivo.id}
+                    emitirEscribir={emitirEscribir}
                 />
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center bg-white min-w-0">

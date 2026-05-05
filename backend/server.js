@@ -29,7 +29,8 @@ const usuarioSchema = new mongoose.Schema({
     nombre: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    contactos: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }] 
+    contactos: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }],
+    solicitudes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }]
 });
 
 const Usuario = mongoose.model('Usuario', usuarioSchema);
@@ -88,12 +89,13 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/usuarios/:id', async (req, res) => {
     try {
-        const usuario = await Usuario.findById(req.params.id).populate('contactos', 'nombre email _id');
-        if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
-        
-        res.status(200).json(usuario.contactos);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+        const usuario = await Usuario.findById(req.params.id)
+            .populate('contactos', 'nombre email _id')
+            .populate('solicitudes', 'nombre email _id');
+
+        res.status(200).json({ contactos: usuario.contactos, solicitudes: usuario.solicitudes });
+    } catch (error) { 
+        res.status(500).json({ error: error.message }); 
     }
 });
 
@@ -110,6 +112,40 @@ app.post('/api/contactos/agregar', async (req, res) => {
         res.status(200).json({ success: true, mensaje: "Contacto agregado correctamente" });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/contactos/solicitar', async (req, res) => {
+    const { miId, emailContacto } = req.body;
+    try {
+        const contacto = await Usuario.findOne({ email: emailContacto });
+        if (!contacto) return res.status(404).json({ error: "No existe un usuario con ese correo." });
+        if (contacto._id.toString() === miId) return res.status(400).json({ error: "No puedes agregarte a ti mismo." });
+        if (contacto.contactos.includes(miId)) return res.status(400).json({ error: "Ya son contactos." });
+        if (contacto.solicitudes.includes(miId)) return res.status(400).json({ error: "Ya le enviaste una solicitud." });
+
+        await Usuario.findByIdAndUpdate(contacto._id, { $addToSet: { solicitudes: miId } });
+        res.status(200).json({ success: true, mensaje: "Solicitud enviada. Esperando que acepte." });
+    } catch (error) { 
+        res.status(500).json({ error: error.message }); 
+    }
+});
+
+app.post('/api/contactos/aceptar', async (req, res) => {
+    const { miId, solicitanteId } = req.body;
+    try {
+
+        await Usuario.findByIdAndUpdate(miId, { 
+            $addToSet: { contactos: solicitanteId }, 
+            $pull: { solicitudes: solicitanteId } 
+        });
+        await Usuario.findByIdAndUpdate(solicitanteId, { 
+            $addToSet: { contactos: miId } 
+        });
+
+        res.status(200).json({ success: true, mensaje: "Contacto aceptado" });
+    } catch (error) { 
+        res.status(500).json({ error: error.message }); 
     }
 });
 
@@ -254,6 +290,16 @@ io.on('connection', (socket) => {
         } catch (error) {
             console.error("Error borrando para todos:", error);
         }
+    });
+
+    socket.on('escribiendo', ({ de, para }) => {
+        const socketDest = usuariosConectados.get(para);
+        if (socketDest) io.to(socketDest).emit('escribiendo', de);
+    });
+
+    socket.on('dejo_de_escribir', ({ de, para }) => {
+        const socketDest = usuariosConectados.get(para);
+        if (socketDest) io.to(socketDest).emit('dejo_de_escribir', de);
     });
 
     socket.on('disconnect', () => {
