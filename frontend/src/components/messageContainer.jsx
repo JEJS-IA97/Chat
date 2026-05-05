@@ -4,24 +4,36 @@ import { Message } from "./message";
 import { useRef, useEffect } from "react";
 
 export const MessageContainer = ({
-    mensajes,
-    miUsuario,
-    contactoActivo,
-    contactoOnline,
-    onEnviar,
+    mensajes, 
+    miUsuario, 
+    contactoActivo, 
+    contactoOnline, 
+    onEnviar, 
     isSearchOpen,
-    onOpenSearch,
-    onCloseSearch,
-    searchTerm,
-    setSearchTerm,
-    onBorrarParaMi,
-    onBorrarParaTodos
+    onOpenSearch, 
+    onCloseSearch, 
+    searchTerm, 
+    setSearchTerm, 
+    onBorrarParaMi, 
+    onBorrarParaTodos,
+    isTyping, 
+    emitirEscribir 
 }) => {
     const chatEndRef = useRef(null);
+    const typingTimeoutRef = useRef(null);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [mensajes]);
+    }, [mensajes, isTyping]); 
+
+    const handleKeyDown = () => {
+        if (!emitirEscribir) return;
+        emitirEscribir(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            emitirEscribir(false);
+        }, 2000); 
+    };
 
     return (
         <section className="flex-1 h-full flex flex-col min-w-0 bg-white">
@@ -65,10 +77,23 @@ export const MessageContainer = ({
                     />
                 ))}
 
+                {isTyping && contactoActivo && (
+                    <div className="flex items-center gap-2 self-start w-full max-w-[600px] animate-pulse">
+                        <div className="h-[30px] w-[30px] rounded-full bg-[#6daad7] text-white font-bold flex-shrink-0 flex items-center justify-center text-[12px]">
+                            {contactoActivo.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-[13px] font-semibold text-slate-500 italic bg-slate-100 px-4 py-2 rounded-r-2xl rounded-bl-2xl">
+                            escribiendo...
+                        </span>
+                    </div>
+                )}
+
                 <div ref={chatEndRef} />
             </div>
 
-            <MessageType onEnviar={onEnviar} />
+            <div onKeyDown={handleKeyDown} className="w-full">
+                <MessageType onEnviar={onEnviar} />
+            </div>
         </section>
     )
 }
