@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:e2e": "vite --host 127.0.0.1 --port 4173 --configLoader runner",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

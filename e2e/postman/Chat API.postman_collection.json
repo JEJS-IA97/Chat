@@ -1,0 +1,124 @@
+{
+  "info": {
+    "_postman_id": "7c7747f3-8a44-4ce1-9c1a-60f12b8b0fd7",
+    "name": "Chat API - Full CRUD",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Registro",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const uniqueId = Date.now();",
+                  "pm.collectionVariables.set('chat_test_name', `QA User ${uniqueId}`);",
+                  "pm.collectionVariables.set('chat_test_email', `qa.${uniqueId}@test.com`);",
+                  "pm.collectionVariables.set('chat_test_password', 'Qa123456!');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{chat_test_name}}\",\n  \"email\": \"{{chat_test_email}}\",\n  \"password\": \"{{chat_test_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/registro" }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('chat_test_token', body.token);",
+                  "  pm.collectionVariables.set('chat_test_user_id', body.usuario.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{chat_test_email}}\",\n  \"password\": \"{{chat_test_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "Ver Perfil",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{chat_test_token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/usuarios/perfil/{{chat_test_email}}" }
+          }
+        },
+        {
+          "name": "Modificar Usuario",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{chat_test_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{chat_test_email}}\",\n  \"nuevoNombre\": \"{{chat_test_name}} Updated\",\n  \"nuevaPassword\": \"NewPass123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/usuarios/modificar" }
+          }
+        },
+        {
+          "name": "Eliminar Usuario (Cleanup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Usuario eliminado', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.unset('chat_test_token');",
+                  "pm.collectionVariables.unset('chat_test_email');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/usuarios/eliminar/{{chat_test_email}}" }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "chat_test_name", "value": "" },
+    { "key": "chat_test_email", "value": "" },
+    { "key": "chat_test_password", "value": "" },
+    { "key": "chat_test_token", "value": "" },
+    { "key": "chat_test_user_id", "value": "" }
+  ]
+}

@@ -12,17 +12,19 @@ export const MessageType = ({ onEnviar}) => {
     }
 
 return(
-        <form onSubmit={handleSubmit} className={`h-[40px] w-auto flex overflow-hidden items-center justify-center m-[10px] gap-[10px]`}>
+        <form onSubmit={handleSubmit} className={`m-3 flex w-auto items-center justify-center gap-2 overflow-hidden sm:m-[10px] sm:gap-[10px]`}>
             <input 
+            data-testid="message-input"
             type="text"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Type a message..." 
-            className="text-[#6daad7] text-[14px] font-bold pl-4 pr-4 focus:outline-none h-[40px] w-full bg-[#c7e3f9] rounded-lg"
+            className="h-[42px] w-full rounded-lg bg-[#c7e3f9] pl-3 pr-3 text-[14px] font-bold text-[#6daad7] focus:outline-none sm:h-[40px] sm:pl-4 sm:pr-4"
             />
             <button 
             type="submit"
-            className='w-[40px] h-[40px] flex items-center justify-center bg-[#6daad7] cursor-pointer rounded-full'>
+            data-testid="send-message-button"
+            className='flex h-[42px] w-[42px] items-center justify-center rounded-full bg-[#6daad7] cursor-pointer sm:h-[40px] sm:w-[40px]'>
                 <span className="text-white text-lg">➤</span>
             </button>
         </form>

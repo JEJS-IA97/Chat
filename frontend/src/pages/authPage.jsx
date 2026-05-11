@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_URL } from '../config/env';
 
 export const AuthPage = ({ onLoginSuccess }) => {
     const [isLogin, setIsLogin] = useState(true);
@@ -19,7 +20,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
         setSuccessMsg('');
 
         const endpoint = isLogin ? '/api/auth/login' : '/api/auth/registro';
-        const url = `https://chat-vrjv.onrender.com${endpoint}`;
+        const url = `${API_URL}${endpoint}`;
 
         try {
             const response = await fetch(url, {
@@ -83,6 +84,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
                         <div className="flex flex-col gap-1">
                             <label className="text-[13px] font-bold text-slate-700 ml-1">Nombre</label>
                             <input
+                                data-testid="nombre-input"
                                 type="text"
                                 name="nombre"
                                 value={formData.nombre}
@@ -97,6 +99,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
                     <div className="flex flex-col gap-1">
                         <label className="text-[13px] font-bold text-slate-700 ml-1">Correo Electrónico</label>
                         <input
+                            data-testid="email-input"
                             type="email"
                             name="email"
                             value={formData.email}
@@ -110,6 +113,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
                     <div className="flex flex-col gap-1">
                         <label className="text-[13px] font-bold text-slate-700 ml-1">Contraseña</label>
                         <input
+                            data-testid="password-input"
                             type="password"
                             name="password"
                             value={formData.password}
@@ -122,6 +126,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
 
                     <button
                         type="submit"
+                        data-testid="submit-button"
                         disabled={loading}
                         className={`mt-4 w-full rounded-xl bg-[#6daad7] px-4 py-3 text-[16px] font-bold text-white transition-colors 
                             ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[#477ea0] cursor-pointer'}`}
@@ -135,6 +140,7 @@ export const AuthPage = ({ onLoginSuccess }) => {
                         {isLogin ? '¿No tienes una cuenta?' : '¿Ya tienes una cuenta?'}
                         <button
                             type="button"
+                            data-testid="register-button"
                             onClick={() => {
                                 setIsLogin(!isLogin);
                                 setError('');

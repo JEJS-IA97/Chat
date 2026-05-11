@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -7,23 +9,60 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-app.use(cors());
+const corsOrigin = process.env.CORS_ORIGIN || '*';
+
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+
+const swaggerOptions = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'MiChatApp API',
+            version: '1.0.0',
+            description: 'API de mensajería con autenticación JWT y gestión de contactos',
+        },
+        servers: [{ url: `http://localhost:${process.env.PORT || 3000}` }],
+    },
+    apis: ['./server.js'],
+};
+const swaggerDocs = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+app.use(cors({
+    origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((origin) => origin.trim()),
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: false
+}));
 app.use(express.json());
 const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map((origin) => origin.trim()),
         methods: ["GET", "POST"]
     }
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || "mi_clave_secreta_super_segura";
-const MONGO_URI = "mongodb+srv://joseejimenez1411_db_user:ha4A9GE153AKQOCu@cluster0.hzcqvaf.mongodb.net/MiChatApp?retryWrites=true&w=majority&appName=Cluster0";
+const JWT_SECRET = process.env.JWT_SECRET;
+const MONGO_URI = process.env.MONGO_URI;
+const shouldSkipDb = process.env.SKIP_DB === 'true';
 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('Conectado a MongoDB con exito'))
-    .catch(err => console.error('Error conectando a MongoDB:', err));
+if (shouldSkipDb) {
+    console.log('MongoDB omitido temporalmente con SKIP_DB=true');
+} else {
+    if (!JWT_SECRET) {
+        throw new Error('Falta JWT_SECRET en las variables de entorno.');
+    }
+
+    if (!MONGO_URI) {
+        throw new Error('Falta MONGO_URI en las variables de entorno.');
+    }
+
+    mongoose.connect(MONGO_URI)
+        .then(() => console.log('Conectado a MongoDB con exito'))
+        .catch(err => console.error('Error conectando a MongoDB:', err));
+}
 
 const usuarioSchema = new mongoose.Schema({
     nombre: { type: String, required: true },
@@ -45,6 +84,20 @@ const mensajeSchema = new mongoose.Schema({
 });
 
 const Mensaje = mongoose.model('Mensaje', mensajeSchema);
+
+app.get('/api/health', (_req, res) => {
+    const estadosMongo = {
+        0: 'disconnected',
+        1: 'connected',
+        2: 'connecting',
+        3: 'disconnecting'
+    };
+
+    res.status(200).json({
+        api: 'ok',
+        dbState: shouldSkipDb ? 'skipped' : (estadosMongo[mongoose.connection.readyState] || 'unknown')
+    });
+});
 
 app.post('/api/auth/registro', async (req, res) => {
     try {
@@ -96,6 +149,48 @@ app.get('/api/usuarios/:id', async (req, res) => {
         res.status(200).json({ contactos: usuario.contactos, solicitudes: usuario.solicitudes });
     } catch (error) { 
         res.status(500).json({ error: error.message }); 
+    }
+});
+
+app.get('/api/usuarios/perfil/:email', async (req, res) => {
+    try {
+        const usuario = await Usuario.findOne({ email: req.params.email }).select('-password');
+        if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+        res.status(200).json(usuario);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/usuarios/modificar', async (req, res) => {
+    try {
+        const { email, nuevoNombre, nuevaPassword } = req.body;
+        const updates = {};
+        
+        if (nuevoNombre) updates.nombre = nuevoNombre;
+        if (nuevaPassword) {
+            const salt = await bcrypt.genSalt(10);
+            updates.password = await bcrypt.hash(nuevaPassword, salt);
+        }
+
+        const usuario = await Usuario.findOneAndUpdate({ email }, updates, { new: true }).select('-password');
+        res.status(200).json({ mensaje: "Usuario actualizado", usuario });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/usuarios/eliminar/:email', async (req, res) => {
+    try {
+        const resultado = await Usuario.findOneAndDelete({ email: req.params.email });
+        if (!resultado) return res.status(404).json({ error: "No se encontró el usuario para eliminar" });
+        
+        // Opcional: Borrar también sus mensajes
+        await Mensaje.deleteMany({ $or: [{ remitenteId: resultado._id }, { destinatarioId: resultado._id }] });
+
+        res.status(200).json({ mensaje: "Usuario y datos relacionados eliminados correctamente" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -313,6 +408,17 @@ io.on('connection', (socket) => {
 
 const PUERTO = process.env.PORT || 3000;
 
-server.listen(PUERTO, () => {
-    console.log(`Servidor de chat corriendo en el puerto: ${PUERTO}`);
+const startServer = (puerto = PUERTO) => server.listen(puerto, () => {
+    console.log(`Servidor de chat corriendo en el puerto: ${puerto}`);
 });
+
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = {
+    app,
+    io,
+    server,
+    startServer
+};
