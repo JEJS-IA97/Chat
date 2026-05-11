@@ -7,27 +7,18 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const swaggerUi = require('swagger-ui-express');
+
+const { buildSwaggerSpec } = require('./swagger');
 
 const app = express();
 const corsOrigin = process.env.CORS_ORIGIN || '*';
+const shouldSkipDb = process.env.SKIP_DB === 'true';
+const defaultJwtSecret = 'mi_clave_secreta_super_segura';
+const defaultMongoUri = 'mongodb+srv://joseejimenez1411_db_user:ha4A9GE153AKQOCu@cluster0.hzcqvaf.mongodb.net/MiChatApp?retryWrites=true&w=majority&appName=Cluster0';
 
-const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
-
-const swaggerOptions = {
-    definition: {
-        openapi: '3.0.0',
-        info: {
-            title: 'MiChatApp API',
-            version: '1.0.0',
-            description: 'API de mensajería con autenticación JWT y gestión de contactos',
-        },
-        servers: [{ url: `http://localhost:${process.env.PORT || 3000}` }],
-    },
-    apis: ['./server.js'],
-};
-const swaggerDocs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+const JWT_SECRET = process.env.JWT_SECRET?.trim() || defaultJwtSecret;
+const MONGO_URI = process.env.MONGO_URI?.trim() || defaultMongoUri;
 
 app.use(cors({
     origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((origin) => origin.trim()),
@@ -35,21 +26,19 @@ app.use(cors({
     credentials: false
 }));
 app.use(express.json());
+
+const swaggerDocs = buildSwaggerSpec();
+app.get('/api-docs.json', (_req, res) => res.status(200).json(swaggerDocs));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
         origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map((origin) => origin.trim()),
-        methods: ["GET", "POST"]
+        methods: ['GET', 'POST']
     }
 });
-
-const shouldSkipDb = process.env.SKIP_DB === 'true';
-const defaultJwtSecret = 'mi_clave_secreta_super_segura';
-const defaultMongoUri = 'mongodb+srv://joseejimenez1411_db_user:ha4A9GE153AKQOCu@cluster0.hzcqvaf.mongodb.net/MiChatApp?retryWrites=true&w=majority&appName=Cluster0';
-
-const JWT_SECRET = process.env.JWT_SECRET?.trim() || defaultJwtSecret;
-const MONGO_URI = process.env.MONGO_URI?.trim() || defaultMongoUri;
 
 if (shouldSkipDb) {
     console.log('MongoDB omitido temporalmente con SKIP_DB=true');
@@ -64,7 +53,7 @@ if (shouldSkipDb) {
 
     mongoose.connect(MONGO_URI)
         .then(() => console.log('Conectado a MongoDB con exito'))
-        .catch(err => console.error('Error conectando a MongoDB:', err));
+        .catch((err) => console.error('Error conectando a MongoDB:', err));
 }
 
 const usuarioSchema = new mongoose.Schema({
@@ -105,9 +94,9 @@ app.get('/api/health', (_req, res) => {
 app.post('/api/auth/registro', async (req, res) => {
     try {
         const { nombre, email, password } = req.body;
-        
+
         const existe = await Usuario.findOne({ email });
-        if (existe) return res.status(400).json({ error: "El email ya está en uso" });
+        if (existe) return res.status(400).json({ error: 'El email ya esta en uso' });
 
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
@@ -115,7 +104,7 @@ app.post('/api/auth/registro', async (req, res) => {
         const nuevoUsuario = new Usuario({ nombre, email, password: passwordHash });
         await nuevoUsuario.save();
 
-        res.status(201).json({ mensaje: "Usuario creado exitosamente" });
+        res.status(201).json({ mensaje: 'Usuario creado exitosamente' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -124,20 +113,27 @@ app.post('/api/auth/registro', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        
+
         const usuario = await Usuario.findOne({ email });
-        if (!usuario) return res.status(400).json({ error: "Usuario no encontrado" });
+        if (!usuario) return res.status(400).json({ error: 'Usuario no encontrado' });
 
         const passCorrecta = await bcrypt.compare(password, usuario.password);
-        if (!passCorrecta) return res.status(400).json({ error: "Contraseña incorrecta" });
+        if (!passCorrecta) return res.status(400).json({ error: 'Contrasena incorrecta' });
 
         const token = jwt.sign(
-            { id: usuario._id, nombre: usuario.nombre }, 
-            JWT_SECRET, 
+            { id: usuario._id, nombre: usuario.nombre },
+            JWT_SECRET,
             { expiresIn: '7d' }
         );
 
-        res.status(200).json({ token, usuario: { id: usuario._id, nombre: usuario.nombre, email: usuario.email } });
+        res.status(200).json({
+            token,
+            usuario: {
+                id: usuario._id,
+                nombre: usuario.nombre,
+                email: usuario.email
+            }
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -149,16 +145,22 @@ app.get('/api/usuarios/:id', async (req, res) => {
             .populate('contactos', 'nombre email _id')
             .populate('solicitudes', 'nombre email _id');
 
-        res.status(200).json({ contactos: usuario.contactos, solicitudes: usuario.solicitudes });
-    } catch (error) { 
-        res.status(500).json({ error: error.message }); 
+        if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        res.status(200).json({
+            contactos: usuario.contactos,
+            solicitudes: usuario.solicitudes
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
 app.get('/api/usuarios/perfil/:email', async (req, res) => {
     try {
         const usuario = await Usuario.findOne({ email: req.params.email }).select('-password');
-        if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+        if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
         res.status(200).json(usuario);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -169,7 +171,7 @@ app.put('/api/usuarios/modificar', async (req, res) => {
     try {
         const { email, nuevoNombre, nuevaPassword } = req.body;
         const updates = {};
-        
+
         if (nuevoNombre) updates.nombre = nuevoNombre;
         if (nuevaPassword) {
             const salt = await bcrypt.genSalt(10);
@@ -177,7 +179,7 @@ app.put('/api/usuarios/modificar', async (req, res) => {
         }
 
         const usuario = await Usuario.findOneAndUpdate({ email }, updates, { new: true }).select('-password');
-        res.status(200).json({ mensaje: "Usuario actualizado", usuario });
+        res.status(200).json({ mensaje: 'Usuario actualizado', usuario });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -186,12 +188,16 @@ app.put('/api/usuarios/modificar', async (req, res) => {
 app.delete('/api/usuarios/eliminar/:email', async (req, res) => {
     try {
         const resultado = await Usuario.findOneAndDelete({ email: req.params.email });
-        if (!resultado) return res.status(404).json({ error: "No se encontró el usuario para eliminar" });
-        
-        // Opcional: Borrar también sus mensajes
-        await Mensaje.deleteMany({ $or: [{ remitenteId: resultado._id }, { destinatarioId: resultado._id }] });
+        if (!resultado) return res.status(404).json({ error: 'No se encontro el usuario para eliminar' });
 
-        res.status(200).json({ mensaje: "Usuario y datos relacionados eliminados correctamente" });
+        await Mensaje.deleteMany({
+            $or: [
+                { remitenteId: resultado._id },
+                { destinatarioId: resultado._id }
+            ]
+        });
+
+        res.status(200).json({ mensaje: 'Usuario y datos relacionados eliminados correctamente' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -199,15 +205,16 @@ app.delete('/api/usuarios/eliminar/:email', async (req, res) => {
 
 app.post('/api/contactos/agregar', async (req, res) => {
     const { miId, emailContacto } = req.body;
+
     try {
         const nuevoContacto = await Usuario.findOne({ email: emailContacto });
-        if (!nuevoContacto) return res.status(404).json({ error: "No existe un usuario registrado con ese correo." });
-        if (nuevoContacto._id.toString() === miId) return res.status(400).json({ error: "No puedes agregarte a ti mismo." });
+        if (!nuevoContacto) return res.status(404).json({ error: 'No existe un usuario registrado con ese correo.' });
+        if (nuevoContacto._id.toString() === miId) return res.status(400).json({ error: 'No puedes agregarte a ti mismo.' });
 
         await Usuario.findByIdAndUpdate(miId, { $addToSet: { contactos: nuevoContacto._id } });
         await Usuario.findByIdAndUpdate(nuevoContacto._id, { $addToSet: { contactos: miId } });
 
-        res.status(200).json({ success: true, mensaje: "Contacto agregado correctamente" });
+        res.status(200).json({ success: true, mensaje: 'Contacto agregado correctamente' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -215,40 +222,43 @@ app.post('/api/contactos/agregar', async (req, res) => {
 
 app.post('/api/contactos/solicitar', async (req, res) => {
     const { miId, emailContacto } = req.body;
+
     try {
         const contacto = await Usuario.findOne({ email: emailContacto });
-        if (!contacto) return res.status(404).json({ error: "No existe un usuario con ese correo." });
-        if (contacto._id.toString() === miId) return res.status(400).json({ error: "No puedes agregarte a ti mismo." });
-        if (contacto.contactos.includes(miId)) return res.status(400).json({ error: "Ya son contactos." });
-        if (contacto.solicitudes.includes(miId)) return res.status(400).json({ error: "Ya le enviaste una solicitud." });
+        if (!contacto) return res.status(404).json({ error: 'No existe un usuario con ese correo.' });
+        if (contacto._id.toString() === miId) return res.status(400).json({ error: 'No puedes agregarte a ti mismo.' });
+        if (contacto.contactos.includes(miId)) return res.status(400).json({ error: 'Ya son contactos.' });
+        if (contacto.solicitudes.includes(miId)) return res.status(400).json({ error: 'Ya le enviaste una solicitud.' });
 
         await Usuario.findByIdAndUpdate(contacto._id, { $addToSet: { solicitudes: miId } });
-        res.status(200).json({ success: true, mensaje: "Solicitud enviada. Esperando que acepte." });
-    } catch (error) { 
-        res.status(500).json({ error: error.message }); 
+        res.status(200).json({ success: true, mensaje: 'Solicitud enviada. Esperando que acepte.' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
 app.post('/api/contactos/aceptar', async (req, res) => {
     const { miId, solicitanteId } = req.body;
+
     try {
-
-        await Usuario.findByIdAndUpdate(miId, { 
-            $addToSet: { contactos: solicitanteId }, 
-            $pull: { solicitudes: solicitanteId } 
-        });
-        await Usuario.findByIdAndUpdate(solicitanteId, { 
-            $addToSet: { contactos: miId } 
+        await Usuario.findByIdAndUpdate(miId, {
+            $addToSet: { contactos: solicitanteId },
+            $pull: { solicitudes: solicitanteId }
         });
 
-        res.status(200).json({ success: true, mensaje: "Contacto aceptado" });
-    } catch (error) { 
-        res.status(500).json({ error: error.message }); 
+        await Usuario.findByIdAndUpdate(solicitanteId, {
+            $addToSet: { contactos: miId }
+        });
+
+        res.status(200).json({ success: true, mensaje: 'Contacto aceptado' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
 app.put('/api/mensajes/limpiar-local', async (req, res) => {
     const { usuarioId, contactoId } = req.body;
+
     try {
         await Mensaje.updateMany(
             {
@@ -257,8 +267,9 @@ app.put('/api/mensajes/limpiar-local', async (req, res) => {
                     { remitenteId: contactoId, destinatarioId: usuarioId }
                 ]
             },
-            { $addToSet: { borradoPor: usuarioId } } 
+            { $addToSet: { borradoPor: usuarioId } }
         );
+
         res.status(200).json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -267,6 +278,7 @@ app.put('/api/mensajes/limpiar-local', async (req, res) => {
 
 app.delete('/api/mensajes/borrar-definitivo', async (req, res) => {
     const { usuarioId, contactoId } = req.body;
+
     try {
         await Mensaje.deleteMany({
             $or: [
@@ -274,6 +286,7 @@ app.delete('/api/mensajes/borrar-definitivo', async (req, res) => {
                 { remitenteId: contactoId, destinatarioId: usuarioId }
             ]
         });
+
         res.status(200).json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -288,13 +301,13 @@ const emitirUsuariosConectados = () => {
 
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
-    
+
     if (!token) {
-        return next(new Error("Autenticación denegada"));
+        return next(new Error('Autenticacion denegada'));
     }
 
     jwt.verify(token, JWT_SECRET, (err, decodificado) => {
-        if (err) return next(new Error("Token inválido"));
+        if (err) return next(new Error('Token invalido'));
 
         socket.data.userId = decodificado.id;
         socket.data.nombre = decodificado.nombre;
@@ -315,16 +328,16 @@ io.on('connection', (socket) => {
                 { remitenteId: usuarioId, destinatarioId: contactoId },
                 { remitenteId: contactoId, destinatarioId: usuarioId }
             ],
-            borradoPor: { $ne: usuarioId } 
+            borradoPor: { $ne: usuarioId }
         }).sort({ fecha: 1 });
-        
+
         socket.emit('historial_mensajes', mensajes);
     });
 
-    socket.on('registrar_usuario', (userId) => {
-        if (!userId) return;
-        socket.data.userId = userId;
-        usuariosConectados.set(userId, socket.id);
+    socket.on('registrar_usuario', (id) => {
+        if (!id) return;
+        socket.data.userId = id;
+        usuariosConectados.set(id, socket.id);
         emitirUsuariosConectados();
     });
 
@@ -345,9 +358,8 @@ io.on('connection', (socket) => {
             }
 
             socket.emit('recibir_mensaje', nuevoMensaje);
-
         } catch (error) {
-            console.error("Error guardando el mensaje:", error);
+            console.error('Error guardando el mensaje:', error);
         }
     });
 
@@ -360,11 +372,12 @@ io.on('connection', (socket) => {
                         { remitenteId: contactoId, destinatarioId: usuarioId }
                     ]
                 },
-                { $addToSet: { borradoPor: usuarioId } } 
+                { $addToSet: { borradoPor: usuarioId } }
             );
+
             socket.emit('chat_limpiado');
         } catch (error) {
-            console.error("Error borrando localmente:", error);
+            console.error('Error borrando localmente:', error);
         }
     });
 
@@ -378,7 +391,7 @@ io.on('connection', (socket) => {
             });
 
             const datosChat = { usuario1: usuarioId, usuario2: contactoId };
-            
+
             socket.emit('chat_limpiado', datosChat);
 
             const socketDestinatario = usuariosConectados.get(contactoId);
@@ -386,7 +399,7 @@ io.on('connection', (socket) => {
                 io.to(socketDestinatario).emit('chat_limpiado', datosChat);
             }
         } catch (error) {
-            console.error("Error borrando para todos:", error);
+            console.error('Error borrando para todos:', error);
         }
     });
 
@@ -405,6 +418,7 @@ io.on('connection', (socket) => {
             usuariosConectados.delete(socket.data.userId);
             emitirUsuariosConectados();
         }
+
         console.log('Usuario desconectado');
     });
 });

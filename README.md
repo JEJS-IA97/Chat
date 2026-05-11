@@ -1,56 +1,152 @@
-# 💬 Real-Time Chat App
+# Real-Time Chat App
 
-Una aplicación de mensajería en tiempo real completa, segura y responsiva, construida con React, Node.js, MongoDB y Socket.io.
+Aplicacion de mensajeria en tiempo real construida con React, Node.js, MongoDB y Socket.IO.
 
-## 🚀 Características Principales
+## Caracteristicas
+- Autenticacion con JWT y contrasenas cifradas con bcryptjs.
+- Chat en tiempo real con Socket.IO.
+- Historial de mensajes persistido en MongoDB.
+- Solicitudes y gestion de contactos.
+- Limpieza local y borrado definitivo de mensajes.
+- Frontend responsive con React, Vite y Tailwind CSS.
+- Documentacion HTTP con Swagger en `/api-docs`.
 
-* **Autenticación Segura:** Sistema de registro e inicio de sesión utilizando JSON Web Tokens (JWT) y encriptación de contraseñas con bcryptjs.
-* **Mensajería en Tiempo Real:** Comunicación instantánea entre usuarios gracias a la implementación de WebSockets con Socket.io.
-* **Gestión de Historial:** Los mensajes se guardan en una base de datos MongoDB, permitiendo recuperar el historial de chat al iniciar sesión.
-* **Borrado Avanzado de Mensajes:** 
-  * *Borrar para mí:* Oculta los mensajes localmente sin afectar el chat del otro usuario.
-  * *Borrar para todos:* Elimina permanentemente los mensajes de la base de datos para ambos participantes.
-* **Buscador Integrado:** Búsqueda en tiempo real de mensajes específicos dentro de una conversación activa.
-* **Interfaz Moderna:** Diseño limpio y responsivo (adaptable a diferentes tamaños de pantalla) utilizando Tailwind CSS.
+## Stack
 
-## 🛠️ Tecnologías Utilizadas
+### Frontend
+- React
+- Vite
+- Tailwind CSS
+- socket.io-client
 
-**Frontend:**
-* [React](https://reactjs.org/) (con Vite)
-* [Socket.io-client](https://socket.io/)
-* [Tailwind CSS](https://tailwindcss.com/) (Estilos)
+### Backend
+- Node.js
+- Express
+- MongoDB + Mongoose
+- Socket.IO
+- JWT
+- bcryptjs
+- Swagger UI
 
-**Backend:**
-* [Node.js](https://nodejs.org/) & [Express](https://expressjs.com/)
-* [Socket.io](https://socket.io/) (WebSockets)
-* [MongoDB](https://www.mongodb.com/) & [Mongoose](https://mongoosejs.com/) (Base de Datos)
-* [JWT](https://jwt.io/) & [Bcryptjs](https://www.npmjs.com/package/bcryptjs) (Autenticación y Seguridad)
+## Estructura
+- `frontend/`: aplicacion cliente.
+- `backend/`: API HTTP, Socket.IO y Swagger.
+- `e2e/`: base de pruebas con Playwright, Cypress, Selenium, Newman y Lighthouse.
 
-## ⚙️ Instalación y Uso Local
+## Variables de entorno
 
-Sigue estos pasos para correr el proyecto en tu máquina local:
+### Backend
+Usa `backend/.env` tomando como base `backend/.env.example`.
 
-### Prerrequisitos
-* [Node.js](https://nodejs.org/) instalado.
-* Una cuenta en [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) o MongoDB instalado localmente.
+Variables principales:
+- `PORT`: puerto del backend.
+- `JWT_SECRET`: secreto para firmar tokens.
+- `CORS_ORIGIN`: origen permitido para el frontend.
+- `PUBLIC_API_URL`: URL publica usada por Swagger para mostrar el server correcto.
+- `MONGO_URI`: conexion a MongoDB.
+- `SKIP_DB`: si vale `true`, arranca sin conectar MongoDB.
+
+### Frontend
+Usa `frontend/.env.local` tomando como base `frontend/.env.example`.
+
+Variables principales:
+- `VITE_API_URL`
+- `VITE_SOCKET_URL`
+
+## Instalacion local
 
 ### 1. Clonar el repositorio
-
 ```bash
-git clone [https://github.com/JEJS-IA97/Chat.git](https://github.com/JEJS-IA97/Chat.git)
-cd Chat bash
+git clone https://github.com/JEJS-IA97/Chat.git
+cd Chat
 ```
 
-### 2. Configurar el Backend
-
+### 2. Instalar dependencias del backend
 ```bash
 cd backend
 npm install
 ```
 
-### 3. Abre una nueva terminal y navega a la carpeta del frontend
+### 3. Configurar el backend
+Crea `backend/.env` a partir de `backend/.env.example` y completa tus valores reales.
 
+Ejemplo:
+```env
+PORT=3000
+JWT_SECRET=tu_secreto
+CORS_ORIGIN=http://127.0.0.1:4173
+PUBLIC_API_URL=http://127.0.0.1:3000
+MONGO_URI=tu_uri_de_mongodb
+SKIP_DB=false
+```
+
+### 4. Instalar dependencias del frontend
 ```bash
-cd frontend
+cd ../frontend
 npm install
 ```
+
+### 5. Configurar el frontend
+Crea `frontend/.env.local` a partir de `frontend/.env.example`.
+
+Ejemplo:
+```env
+VITE_API_URL=http://127.0.0.1:3000
+VITE_SOCKET_URL=http://127.0.0.1:3000
+```
+
+### 6. Levantar backend y frontend
+En una terminal:
+```bash
+cd backend
+npm run dev
+```
+
+En otra terminal:
+```bash
+cd frontend
+npm run dev
+```
+
+## Swagger
+
+### Ver Swagger en local
+1. Levanta el backend con `npm run dev` dentro de `backend/`.
+2. Abre [http://127.0.0.1:3000/api-docs](http://127.0.0.1:3000/api-docs).
+3. Si quieres el JSON de OpenAPI, abre [http://127.0.0.1:3000/api-docs.json](http://127.0.0.1:3000/api-docs.json).
+
+### Ver Swagger en produccion
+1. Despliega el backend en Render.
+2. Configura `PUBLIC_API_URL` con la URL publica del backend.
+3. Abre `https://tu-backend.onrender.com/api-docs`.
+4. Si quieres el JSON, abre `https://tu-backend.onrender.com/api-docs.json`.
+
+## Produccion
+
+### Render
+Variables recomendadas del backend:
+```env
+JWT_SECRET=tu_secreto
+MONGO_URI=tu_uri_real
+CORS_ORIGIN=https://tu-frontend.vercel.app
+PUBLIC_API_URL=https://tu-backend.onrender.com
+SKIP_DB=false
+```
+
+### Vercel
+Variables recomendadas del frontend:
+```env
+VITE_API_URL=https://tu-backend.onrender.com
+VITE_SOCKET_URL=https://tu-backend.onrender.com
+```
+
+## QA
+La base de pruebas automatizadas vive en `e2e/`.
+
+Comandos utiles:
+- `npm run stack:up`
+- `npm run test:playwright`
+- `npm run test:cypress`
+- `npm run test:selenium`
+- `npm run test:newman`
+- `npm run test:lighthouse`
