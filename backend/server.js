@@ -44,19 +44,22 @@ const io = new Server(server, {
     }
 });
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const MONGO_URI = process.env.MONGO_URI;
 const shouldSkipDb = process.env.SKIP_DB === 'true';
+const defaultJwtSecret = 'mi_clave_secreta_super_segura';
+const defaultMongoUri = 'mongodb+srv://joseejimenez1411_db_user:ha4A9GE153AKQOCu@cluster0.hzcqvaf.mongodb.net/MiChatApp?retryWrites=true&w=majority&appName=Cluster0';
+
+const JWT_SECRET = process.env.JWT_SECRET?.trim() || defaultJwtSecret;
+const MONGO_URI = process.env.MONGO_URI?.trim() || defaultMongoUri;
 
 if (shouldSkipDb) {
     console.log('MongoDB omitido temporalmente con SKIP_DB=true');
 } else {
-    if (!JWT_SECRET) {
-        throw new Error('Falta JWT_SECRET en las variables de entorno.');
+    if (!process.env.JWT_SECRET) {
+        console.warn('JWT_SECRET no definido. Usando valor por defecto.');
     }
 
-    if (!MONGO_URI) {
-        throw new Error('Falta MONGO_URI en las variables de entorno.');
+    if (!process.env.MONGO_URI) {
+        console.warn('MONGO_URI no definido. Usando valor por defecto.');
     }
 
     mongoose.connect(MONGO_URI)
