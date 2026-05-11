@@ -4,51 +4,56 @@ import { Message } from "./message";
 import { useRef, useEffect } from "react";
 
 export const MessageContainer = ({
-    mensajes, 
-    miUsuario, 
-    contactoActivo, 
-    contactoOnline, 
-    onEnviar, 
+    mensajes,
+    miUsuario,
+    contactoActivo,
+    contactoOnline,
+    onEnviar,
     isSearchOpen,
-    onOpenSearch, 
-    onCloseSearch, 
-    searchTerm, 
-    setSearchTerm, 
-    onBorrarParaMi, 
+    onOpenSearch,
+    onCloseSearch,
+    searchTerm,
+    setSearchTerm,
+    onBorrarParaMi,
     onBorrarParaTodos,
-    isTyping, 
-    emitirEscribir 
+    isTyping,
+    emitirEscribir,
+    onVolverMobile
 }) => {
     const chatEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [mensajes, isTyping]); 
+    }, [mensajes, isTyping]);
 
     const handleKeyDown = () => {
         if (!emitirEscribir) return;
+
         emitirEscribir(true);
+
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => {
             emitirEscribir(false);
-        }, 2000); 
+        }, 2000);
     };
 
     return (
-        <section className="flex-1 h-full flex flex-col min-w-0 bg-white">
+        <section className="flex h-full min-w-0 flex-1 flex-col bg-white">
             <ContactProfile
                 contacto={contactoActivo}
                 onOpenSearch={isSearchOpen ? onCloseSearch : onOpenSearch}
                 isOnline={contactoOnline}
                 onBorrarParaMi={onBorrarParaMi}
                 onBorrarParaTodos={onBorrarParaTodos}
+                onVolverMobile={onVolverMobile}
             />
 
             {isSearchOpen && (
-                <div className="px-4 pt-4 pb-2 bg-slate-50 border-b border-[#d1dbe4]">
+                <div className="border-b border-[#d1dbe4] bg-slate-50 px-3 pb-2 pt-3 sm:px-4 sm:pt-4">
                     <div className="flex items-center gap-2 rounded-lg border border-[#6daad7] bg-white p-2 shadow-sm">
                         <input
+                            data-testid="search-messages"
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -66,7 +71,7 @@ export const MessageContainer = ({
                 </div>
             )}
 
-            <div className="w-full max-w-full flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-4 border-b-2 border-[#d1dbe4]">
+            <div className="flex w-full max-w-full flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto border-b-2 border-[#d1dbe4] p-3 sm:gap-4 sm:p-4">
                 {mensajes?.map((msg, index) => (
                     <Message
                         key={index}
@@ -78,11 +83,11 @@ export const MessageContainer = ({
                 ))}
 
                 {isTyping && contactoActivo && (
-                    <div className="flex items-center gap-2 self-start w-full max-w-[600px] animate-pulse">
-                        <div className="h-[30px] w-[30px] rounded-full bg-[#6daad7] text-white font-bold flex-shrink-0 flex items-center justify-center text-[12px]">
+                    <div className="flex w-full max-w-[84%] animate-pulse items-center gap-2 self-start sm:max-w-[78%] lg:max-w-[600px]">
+                        <div className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full bg-[#6daad7] text-[12px] font-bold text-white">
                             {contactoActivo.nombre.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-[13px] font-semibold text-slate-500 italic bg-slate-100 px-4 py-2 rounded-r-2xl rounded-bl-2xl">
+                        <span className="rounded-bl-2xl rounded-r-2xl bg-slate-100 px-4 py-2 text-[13px] font-semibold italic text-slate-500">
                             escribiendo...
                         </span>
                     </div>
@@ -95,5 +100,5 @@ export const MessageContainer = ({
                 <MessageType onEnviar={onEnviar} />
             </div>
         </section>
-    )
+    );
 }

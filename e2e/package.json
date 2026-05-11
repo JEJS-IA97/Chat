@@ -1,0 +1,32 @@
+{
+  "name": "chat-e2e",
+  "private": true,
+  "scripts": {
+    "stack:backend": "npm --prefix ../backend run dev",
+    "stack:frontend": "npm --prefix ../frontend run dev:e2e",
+    "stack:up": "concurrently -k -n api,web -c blue,green \"npm run stack:backend\" \"npm run stack:frontend\"",
+    "test:playwright": "playwright test --config=playwright.config.ts",
+    "test:playwright:frontend": "cross-env PW_SUITE=frontend playwright test ./playwright/tests/frontend --config=playwright.config.ts",
+    "test:playwright:api": "cross-env PW_SUITE=api playwright test ./playwright/tests/api --config=playwright.config.ts",
+    "test:cypress": "cypress run --config-file cypress.config.js --browser electron",
+    "test:cypress:open": "cypress open --config-file cypress.config.js",
+    "test:selenium": "mocha \"./selenium/tests/**/*.spec.js\" --timeout 60000",
+    "test:newman": "newman run \"./postman/Chat API.postman_collection.json\" -e \"./postman/Chat Local.postman_environment.json\" --reporters cli,htmlextra --reporter-htmlextra-export \"./reports/newman/report.html\"",
+    "test:lighthouse": "lhci autorun --config=./lighthouserc.js"
+  },
+  "devDependencies": {
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^24.9.1",
+    "chai": "^6.2.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "cypress": "^15.5.0",
+    "dotenv": "^17.2.3",
+    "mocha": "^11.7.5",
+    "newman": "^6.2.1",
+    "newman-reporter-htmlextra": "^1.23.1",
+    "selenium-webdriver": "^4.37.0",
+    "typescript": "^5.9.3"
+  }
+}

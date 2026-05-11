@@ -1,0 +1,12 @@
+{
+  "primaryUser": {
+    "nombre": "QA Principal",
+    "email": "qa.principal+local@example.com",
+    "password": "Qa123456!"
+  },
+  "secondaryUser": {
+    "nombre": "QA Contacto",
+    "email": "qa.contacto+local@example.com",
+    "password": "Qa123456!"
+  }
+}
